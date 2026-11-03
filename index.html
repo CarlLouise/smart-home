@@ -1,0 +1,539 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light}body{margin:0}[hidden]{display:none!important}</style>
+<title>Home Console</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout concept: control panel. One status banner on top, then instrument cards (climate, lighting, door, security, fire) beside an LCD mirror, then the simulator and the event log with the lab summary table. */
+:root{
+  --bg:#dfeee8; --surface:rgba(10,26,19,0.55); --raised:rgba(18,40,31,0.68); --line:rgba(140,210,175,0.45);
+  --ink:#effff8; --mute:#b4dbc0;
+  --accent:#7ee7b5; --accent-ink:#062c1f;
+  --ok:#8ae4a3; --warn:#f4d276; --bad:#ff6e7e;
+  --lcd-bg:rgba(122,180,132,0.75); --lcd-fg:#062a1e;
+  color-scheme:light;
+  --f-display:'Barlow Condensed','Arial Narrow',sans-serif;
+  --f-body:'IBM Plex Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --f-mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  min-height:100vh;
+  color:var(--ink);
+  font:14px/1.5 var(--f-body);
+  padding-block:20px 56px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));
+  padding-right:max(16px,env(safe-area-inset-right,0px));
+  background:
+    linear-gradient(rgba(6,16,12,.56), rgba(6,16,12,.68)),
+    url('background.jpg') center/cover no-repeat fixed;
+  backdrop-filter: blur(2px);
+}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:16px;position:relative;z-index:1}
+body::before{
+  content:"";
+  position:fixed;
+  inset:0;
+  background:radial-gradient(circle at top, rgba(125,242,194,0.18), transparent 40%), rgba(255,255,255,0.06);
+  backdrop-filter:blur(5px);
+  z-index:0;
+  pointer-events:none;
+}
+.card,.banner,.sim,.panel,.top,.note,.mode,.btn{backdrop-filter:blur(8px)}
+.card,.banner,.sim,.panel{background:rgba(11,27,22,0.52); border:1px solid var(--line); box-shadow:0 0 0 1px rgba(126,231,181,0.08), 0 16px 30px rgba(0,0,0,0.14)}
+.mode,.btn{background:rgba(19,43,35,0.65); border:1px solid var(--line); color:var(--ink)}
+.wrap{max-width:1120px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+h1,h2,h3,p{margin:0}
+.top{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:12px}
+.brand{font:600 30px/1 var(--f-display);letter-spacing:.04em;text-transform:uppercase;color:#ebfff4;text-shadow:0 0 20px rgba(126,231,181,0.35)}
+.brand small{display:block;font:400 11px/1.4 var(--f-mono);letter-spacing:.08em;color:var(--mute);margin-top:4px}
+.conn{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+.mode{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;padding:7px 10px;border:1px solid var(--line);border-radius:3px;background:rgba(16,36,28,0.7); color:var(--ink)}
+.mode[data-live="1"]{color:var(--ok);border-color:rgba(138,228,163,0.8); box-shadow:0 0 12px rgba(138,228,163,0.25)}
+.note{font-size:12px;color:var(--mute);min-height:18px}
+
+.btn{font:500 14px/1.2 var(--f-body);color:var(--ink);background:var(--raised);border:1px solid var(--line);padding:9px 14px;border-radius:5px;cursor:pointer;min-height:40px; box-shadow:0 0 0 1px rgba(126,231,181,0.08), inset 0 1px 0 rgba(255,255,255,0.12)}
+.btn:hover{border-color:rgba(126,231,181,0.7); box-shadow:0 0 16px rgba(126,231,181,0.18)}
+.btn.primary{background:linear-gradient(135deg, rgba(126,231,181,0.9), rgba(67,188,140,0.78));border-color:rgba(126,231,181,0.9);color:var(--accent-ink)}
+.btn.danger{background:linear-gradient(135deg, rgba(255,110,126,0.95), rgba(196,59,75,0.8));border-color:rgba(255,110,126,0.9);color:#fff}
+.btn:focus-visible,.seg button:focus-visible,.mini:focus-visible,input[type=range]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+
+.banner{border:1px solid var(--line);border-radius:6px;background:rgba(12,27,22,0.68);padding:18px 20px;display:grid;gap:4px; box-shadow:0 0 0 1px rgba(126,231,181,0.1), 0 16px 32px rgba(0,0,0,0.18)}
+.banner .state{font:700 clamp(38px,9vw,68px)/1 var(--f-display);letter-spacing:.03em;text-transform:uppercase}
+.banner .sub{color:var(--mute);font-size:14px}
+.banner[data-state="armed"]{border-color:rgba(126,231,181,0.9)}
+.banner[data-state="armed"] .state{color:var(--accent)}
+.banner[data-state="alarm"],.banner[data-state="fire"]{border-color:rgba(255,110,126,0.9);background:rgba(54,16,21,0.72)}
+.banner[data-state="alarm"] .state,.banner[data-state="fire"] .state{color:var(--bad)}
+@media (prefers-reduced-motion:no-preference){
+  .banner[data-state="alarm"],.banner[data-state="fire"]{animation:pulse 1.2s ease-in-out infinite}
+  @keyframes pulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--bad) 30%,transparent)}}
+}
+
+.grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr))}
+.card{background:rgba(10,24,19,0.52);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:14px;min-width:0; box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.12)}
+.head{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.label{font:500 11px/1.2 var(--f-mono);letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+.big{font:600 56px/1 var(--f-display);font-variant-numeric:tabular-nums; color:#effff8; text-shadow:0 0 14px rgba(126,231,181,0.18)}
+.big span{font-size:24px;color:var(--mute);margin-left:4px}
+.row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-end}
+.kv{display:flex;flex-direction:column;gap:2px}
+.kv .v{font:600 30px/1 var(--f-display);font-variant-numeric:tabular-nums; color:#effff8}
+.kv .v span{font-size:16px;color:var(--mute);margin-left:2px}
+.chip{font:500 11px/1 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;padding:5px 8px;border-radius:3px;border:1px solid currentColor;white-space:nowrap; background:rgba(255,255,255,0.02)}
+.chip[data-tone="ok"]{color:var(--ok)}
+.chip[data-tone="warn"]{color:var(--warn)}
+.chip[data-tone="bad"]{color:var(--bad);background:rgba(255,110,126,0.12)}
+.chip[data-tone="off"]{color:var(--mute)}
+.chip[data-tone="on"]{color:var(--accent)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden;align-self:flex-start; background:rgba(13,26,22,0.6)}
+.seg button{font:500 13px/1 var(--f-body);color:var(--ink);background:rgba(19,43,35,0.72);border:0;border-right:1px solid var(--line);padding:11px 16px;cursor:pointer;min-height:40px}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:linear-gradient(135deg, rgba(126,231,181,0.92), rgba(58,169,124,0.72));color:var(--accent-ink)}
+.ctl{display:flex;flex-direction:column;gap:6px}
+.ctl label{font-size:13px;color:var(--mute);display:flex;justify-content:space-between;gap:8px}
+.ctl label b{color:var(--ink);font:500 13px var(--f-mono)}
+input[type=range]{width:100%;accent-color:var(--accent);margin:0;min-height:24px; filter:saturate(1.5)}
+
+.gauge{position:relative;height:8px;background:var(--line);border-radius:4px;margin-top:8px}
+.gauge i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);border-radius:4px;transition:width .3s}
+.gauge b{position:absolute;top:-5px;bottom:-5px;width:2px;background:var(--ink)}
+.gauge-scale{display:flex;justify-content:space-between;font:400 11px var(--f-mono);color:var(--mute)}
+
+.lcd-card{gap:12px}
+.lcd{background:linear-gradient(180deg, rgba(126,231,181,0.78), rgba(116,189,143,0.68));color:var(--lcd-fg);border:1px solid rgba(126,231,181,0.8);border-radius:4px;padding:14px 16px;font:500 clamp(15px,4.4vw,22px)/1.5 var(--f-mono);letter-spacing:.06em;white-space:pre;overflow:hidden;box-shadow:inset 0 2px 8px rgba(0,0,0,0.18), 0 0 20px rgba(126,231,181,0.18)}
+.hint{font-size:12px;color:var(--mute)}
+
+.sim{border:1px dashed rgba(126,231,181,0.55);border-radius:6px;padding:16px;display:grid;gap:14px;background:rgba(10,25,20,0.45)}
+.sim-grid{display:grid;gap:14px 20px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
+.btns{display:flex;flex-wrap:wrap;gap:8px}
+
+.panel{background:rgba(10,24,19,0.52);border:1px solid var(--line);border-radius:6px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0; box-shadow:inset 0 1px 0 rgba(255,255,255,0.05), 0 10px 24px rgba(0,0,0,0.12)}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;min-width:560px;font-variant-numeric:tabular-nums}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid rgba(126,231,181,0.2);font-size:13px;vertical-align:top}
+th{font:500 11px/1.2 var(--f-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+td.mono{font-family:var(--f-mono);font-size:12px}
+.mini{font:500 11px/1 var(--f-mono);border:1px solid var(--line);background:rgba(19,43,35,0.7);color:var(--ink);padding:6px 8px;border-radius:3px;cursor:pointer}
+.mini[aria-pressed="true"]{color:var(--bad);border-color:var(--bad)}
+.empty{color:var(--mute);padding:14px 0}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.two{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr))}
+</style>
+
+ </head><body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="brand">Home Console<small>CPEN 120 · Smart Home Automation and Security</small></h1>
+    <div class="conn">
+      <span class="mode" id="modePill" data-live="0">Simulator</span>
+      <button class="btn primary" id="connectBleBtn" type="button">Connect Bluetooth</button>
+      <button class="btn" id="connectUsbBtn" type="button">Connect USB</button>
+    </div>
+  </header>
+  <p class="note" id="connNote">Simulator is active. Android Chrome can connect over Bluetooth from an HTTPS page; desktop Chrome/Edge can connect over USB.</p>
+
+  <section class="banner" id="banner" data-state="idle" aria-live="polite">
+    <p class="label">Home status</p>
+    <p class="state" id="bannerState">Disarmed</p>
+    <p class="sub" id="bannerSub">All systems normal.</p>
+  </section>
+
+  <div class="grid">
+    <section class="card lcd-card" aria-label="App status display">
+      <div class="head"><h2 class="label">App status display</h2><span class="chip" data-tone="off">Live summary</span></div>
+      <div class="lcd" id="lcd" aria-hidden="true">
+                </div>
+      <p class="hint">A compact summary of the ESP32 readings and current access/fire status.</p>
+    </section>
+
+    <section class="card" aria-label="Climate">
+      <div class="head"><h2 class="label">Climate monitor</h2><span class="chip" data-tone="on">DHT11</span></div>
+      <div class="row">
+        <div class="big" id="tempBig">--<span>°C</span></div>
+        <div class="kv"><span class="label">Humidity</span><span class="v" id="humV">--<span>%</span></span></div>
+      </div>
+      <p class="hint">Room temperature and humidity are read every two seconds and shown in the app status display.</p>
+    </section>
+
+    <section class="card" aria-label="Lighting">
+      <div class="head"><h2 class="label">Smart lighting</h2><span class="chip" id="lightChip" data-tone="off">Lights off</span></div>
+      <div class="row">
+        <div class="kv"><span class="label">Light level (LDR)</span><span class="v" id="ldrV">--<span>/ 4095</span></span></div>
+        <div class="chips"><span class="chip" id="darkChip" data-tone="off">Bright</span><span class="chip" id="pirChip" data-tone="off">No motion</span></div>
+      </div>
+      <div class="seg" role="group" aria-label="Light mode" data-cmd="LIGHT">
+        <button type="button" data-v="A">Auto</button><button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button>
+      </div>
+      <div class="ctl"><label for="darkIn">Dark below <b id="darkVal">1600</b></label><input id="darkIn" type="range" min="100" max="4000" step="50" value="1600"></div>
+      <div class="ctl"><label for="toutIn">Turn off after <b id="toutVal">30 s</b></label><input id="toutIn" type="range" min="5" max="120" step="5" value="30"></div>
+    </section>
+
+    <section class="card" aria-label="Door access">
+      <div class="head"><h2 class="label">Door access</h2><span class="chip" id="doorChip" data-tone="ok">Locked</span></div>
+      <div class="big" id="doorBig" style="font-size:44px">Locked</div>
+      <div class="kv"><span class="label">Last card</span><span id="cardTxt" style="font-family:var(--f-mono);font-size:13px">None yet</span></div>
+      <button class="btn" id="doorBtn" type="button">Unlock door</button>
+      <p class="hint">A configured RFID card unlocks the servo for 3 seconds. Unknown cards are refused.</p>
+    </section>
+
+    <section class="card" aria-label="Fire detection">
+      <div class="head"><h2 class="label">Fire detection</h2><span class="chip" id="fireChip" data-tone="ok">Safe</span></div>
+      <div class="big" id="fireBig" style="font-size:44px">No flame</div>
+      <div class="chips"><span class="chip" id="ledChip" data-tone="off">LED off</span><span class="chip" id="fireBuzzerChip" data-tone="off">Buzzer idle</span></div>
+      <div class="head"><h3 class="label">Fan</h3><span class="chip" id="fanChip" data-tone="off">Off</span></div>
+      <div class="seg" role="group" aria-label="Fan control" data-cmd="FAN">
+        <button type="button" data-v="1">On</button><button type="button" data-v="0">Off</button>
+      </div>
+      <p class="hint">Fan is forced off when flame is detected. Manual fan control is available when no flame is detected.</p>
+      <p class="hint">The flame sensor sounds the buzzer and lights the indicator LED. This is an educational indicator, not a certified fire alarm.</p>
+    </section>
+  </div>
+
+  <section class="sim" id="simPanel" aria-label="Simulator">
+    <div><h2 class="label">Simulator</h2><p class="hint">Nothing here touches hardware. Use it to try every function before wiring the board. Timings in this mode are made up.</p></div>
+    <div class="sim-grid">
+      <div class="ctl"><label for="sTemp">Room temperature <b id="sTempV">27.5 °C</b></label><input id="sTemp" type="range" min="15" max="45" step="0.5" value="27.5"></div>
+      <div class="ctl"><label for="sHum">Humidity <b id="sHumV">62 %</b></label><input id="sHum" type="range" min="20" max="95" step="1" value="62"></div>
+      <div class="ctl"><label for="sLdr">Ambient light <b id="sLdrV">2600</b></label><input id="sLdr" type="range" min="0" max="4095" step="25" value="2600"></div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="sAuth" type="button">Tap authorized card</button>
+      <button class="btn" id="sUnk" type="button">Tap unknown card</button>
+      <button class="btn" id="sFlame" type="button" aria-pressed="false">Hold flame near sensor</button>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+'use strict';
+var $=function(id){return document.getElementById(id);};
+var S={temp:27.5,hum:62,ldr:2600,pir:0,flame:0,armed:false,locked:true,light:false,fan:false,alarm:false,fire:false,buzzer:false,appliances:true,lm:'A',dark:1600,tout:30};
+var mode='sim',transport='none',port=null,writer=null,reader=null,bleDevice=null,bleCharacteristic=null;
+var bleServiceUuid='7d2ea28a-f7bd-485a-bd9d-92ad6ecfe93e';
+var bleCharacteristicUuid='7d2ea28b-f7bd-485a-bd9d-92ad6ecfe93e';
+var pirUntil=0,unlockUntil=0,doorHold=false,deniedUntil=0,lcdMsg=['',''],lcdUntil=0,autoLit=false,lastMotion=0,logId=0,logDirty=true;
+var logs=[];
+
+function now(){return Date.now();}
+function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+function pad(s){return String(s).padEnd(16).slice(0,16);}
+function ctx(){return {light:S.ldr>=S.dark?'Bright':'Dim',sec:S.alarm?'Intrusion':'Normal'};}
+function labKind(k){return k==='rfid'?'rfid':(k==='alarm'||k==='motion')?'motion':k==='light'?'light':null;}
+function rtSim(){return 30+Math.round(Math.random()*80);}
+
+function logEvent(kind,text,rt){
+  logs.unshift({id:++logId,time:new Date(),kind:kind,text:text,rt:rt==null?null:rt,ctx:ctx(),lab:labKind(kind),bad:false});
+  if(logs.length>200)logs.pop();
+  logDirty=true;
+}
+function setLcd(a,b,ms){lcdMsg=[a,b];lcdUntil=now()+(ms||2500);}
+
+/* ---------- commands (same names the Arduino understands) ---------- */
+function applyCmd(name,v){
+  switch(name){
+    case 'ARM':
+      S.armed=!!+v; if(!S.armed)S.alarm=false;
+      logEvent('security',S.armed?'System armed':'System disarmed',null); break;
+    case 'LIGHT': S.lm=v; break;
+    case 'FAN': S.fan=v==='1'&&!S.fire; break;
+    case 'DOOR':
+      S.locked=!!+v; doorHold=!S.locked;
+      logEvent('door',S.locked?'Door locked from the app':'Door unlocked from the app',null);
+      setLcd(S.locked?'Door LOCKED':'Door UNLOCKED','',2000); break;
+    case 'DARK': S.dark=+v; break;
+    case 'TOUT': S.tout=+v; break;
+  }
+  simStep();
+}
+function cmd(name,v){
+  if(mode==='live')send(name+':'+v); else applyCmd(name,v);
+}
+
+/* ---------- simulator ---------- */
+function simStep(){
+  var t=now(),dark=S.ldr<S.dark,prevLight=S.light;
+  if(S.pir&&t>pirUntil)S.pir=0;
+  var wasFire=S.fire;
+  S.fire=!!S.flame; S.appliances=!S.fire;
+  if(S.fire)S.fan=false;
+  S.buzzer=S.fire||S.alarm;
+  if(S.fire&&!wasFire)logEvent('fire','Flame detected: buzzer and indicator LED on',rtSim());
+  if(!S.fire&&wasFire)logEvent('fire','Flame cleared: buzzer off',null);
+  if(S.lm==='A'){
+    if(autoLit&&t-lastMotion>S.tout*1000)autoLit=false;
+    S.light=autoLit||S.alarm||S.fire;
+  }else S.light=(S.lm==='1')||S.alarm||S.fire;
+  if(S.lm==='A'&&prevLight&&!S.light&&!S.alarm&&!S.fire)logEvent('light','No motion for '+S.tout+' s: lights OFF',null);
+  if(!S.locked&&!doorHold&&t>unlockUntil){S.locked=true;logEvent('door','Door relocked',null);}
+}
+function simMotion(){
+  var t=now(),dark=S.ldr<S.dark;
+  S.pir=1;pirUntil=t+2500;
+  if(S.armed){
+    if(!S.alarm){S.alarm=true;S.buzzer=true;logEvent('alarm','Intruder detected: buzzer and indicator LED on',rtSim());setLcd('INTRUDER','DETECTED!',4000);}
+  }else if(S.lm==='A'){
+    if(dark){
+      var was=S.light;lastMotion=t;autoLit=true;
+      if(!was)logEvent('light','Dark and motion: lights ON',rtSim());
+    }else logEvent('light','Motion in daylight: lights stay OFF',rtSim());
+  }else logEvent('motion','Motion detected (system disarmed)',rtSim());
+  simStep();
+}
+function simCard(ok){
+  var t=now(),uid=ok?'A1 B2 C3 D4':'9F 00 12 7C';
+  logEvent('rfid','Card '+uid+' '+(ok?'accepted: door unlocked':'refused: access denied'),rtSim());
+  S.cardTxt=(ok?'Authorized · ':'Unknown · ')+uid;
+  if(ok){S.locked=false;doorHold=false;unlockUntil=t+5000;setLcd('ACCESS GRANTED','Welcome home',2500);}
+  else{deniedUntil=t+1500;setLcd('ACCESS DENIED','Unknown card',2500);}
+  simStep();
+}
+
+/* ---------- live serial ---------- */
+function note(m){$('connNote').textContent=m;}
+function send(line){
+  if(transport==='ble'&&bleCharacteristic){
+    var bytes=new TextEncoder().encode(line+'\n');
+    bleCharacteristic.writeValueWithResponse(bytes).catch(function(){note('BLE command failed. Check the Bluetooth connection.');});
+  }else if(writer){
+    writer.write(line+'\n').catch(function(){note('USB command failed. Check the cable and connection.');});
+  }
+}
+function parseKv(parts){var o={};parts.forEach(function(p){var i=p.indexOf('=');if(i>0)o[p.slice(0,i)]=p.slice(i+1);});return o;}
+function onLine(line){
+  line=line.trim(); if(line.length<3)return;
+  var head=line.slice(0,2),parts=line.slice(2).split(';');
+  if(head==='S:'){
+    var k=parseKv(parts);
+    if(k.T!=null)S.temp=+k.T; if(k.H!=null)S.hum=+k.H; if(k.L!=null)S.ldr=+k.L;
+    if(k.PIR!=null)S.pir=+k.PIR; if(k.FLAME!=null)S.flame=+k.FLAME;
+    if(k.ARM!=null)S.armed=k.ARM==='1'; if(k.DOOR!=null)S.locked=k.DOOR==='1';
+    if(k.LIGHT!=null)S.light=k.LIGHT==='1';
+    if(k.FAN!=null)S.fan=k.FAN==='1';
+    if(k.ALARM!=null)S.alarm=k.ALARM==='1'; if(k.FIRE!=null)S.fire=k.FIRE==='1';
+    if(k.REL!=null)S.appliances=k.REL==='1';
+    if(k.BUZZ!=null)S.buzzer=k.BUZZ==='1';
+    if(k.LM)S.lm=k.LM;
+    if(k.DARK!=null)S.dark=+k.DARK; if(k.TOUT!=null)S.tout=+k.TOUT;
+  }else if(head==='E:'){
+    var kind=parts[0].toLowerCase(),e=parseKv(parts.slice(1)),rt=e.RT!=null?Math.round(+e.RT):null;
+    if(kind==='rfid'){
+      var g=e.GRANTED==='1';
+      S.cardTxt=(g?'Authorized · ':'Unknown · ')+(e.UID||'');
+      logEvent('rfid','Card '+(e.UID||'')+' '+(g?'accepted: door unlocked':'refused: access denied'),rt);
+      setLcd(g?'ACCESS GRANTED':'ACCESS DENIED',g?'Welcome home':'Unknown card',2500);
+    }else if(kind==='alarm')logEvent('alarm','Intruder detected: buzzer and indicator LED on',rt);
+    else if(kind==='motion')logEvent('motion','Motion detected (system disarmed)',rt);
+    else if(kind==='light')logEvent('light',e.ON==='1'?'Dark and motion: lights ON':'No motion: lights OFF',rt);
+    else if(kind==='fire')logEvent('fire',e.ACTIVE==='0'?'Flame cleared':'Flame detected: indicator LED on',rt);
+    else if(kind==='info')logEvent('info',e.MSG||'',null);
+  }
+}
+async function readLoop(){
+  var buf='';
+  try{
+    for(;;){
+      var r=await reader.read(); if(r.done)break;
+      buf+=r.value; var i;
+      while((i=buf.indexOf('\n'))>=0){onLine(buf.slice(0,i));buf=buf.slice(i+1);}
+    }
+  }catch(e){}
+  goSim('Arduino disconnected. Back on the simulator.');
+}
+async function connectSerial(){
+  if(!('serial' in navigator)){note('This browser has no USB serial support. Open the app in Chrome or Edge.');return;}
+  try{
+    port=await navigator.serial.requestPort();
+    await port.open({baudRate:115200});
+  }catch(e){
+    note(e&&e.name==='NotFoundError'?'No port selected.':'This page cannot use USB here. Open the downloaded app.html file in Chrome or Edge.');
+    port=null;return;
+  }
+  var dec=new TextDecoderStream();
+  port.readable.pipeTo(dec.writable).catch(function(){});
+  reader=dec.readable.getReader();
+  var enc=new TextEncoderStream();
+  enc.readable.pipeTo(port.writable).catch(function(){});
+  writer=enc.writable.getWriter();
+  mode='live';transport='usb';logs=[];logDirty=true;
+  note('Connected to ESP32 over USB. Readings update live.');
+  readLoop();
+}
+async function connectBluetooth(){
+  if(!navigator.bluetooth){note('Web Bluetooth is unavailable. Use Android Chrome over HTTPS, or connect by USB on a computer.');return;}
+  try{
+    bleDevice=await navigator.bluetooth.requestDevice({filters:[{services:[bleServiceUuid]}]});
+    bleDevice.addEventListener('gattserverdisconnected',function(){goSim('Bluetooth disconnected. Back on the simulator.');render();});
+    var server=await bleDevice.gatt.connect();
+    var service=await server.getPrimaryService(bleServiceUuid);
+    bleCharacteristic=await service.getCharacteristic(bleCharacteristicUuid);
+    bleCharacteristic.addEventListener('characteristicvaluechanged',function(ev){
+      var value=ev.target.value;
+      var text=new TextDecoder().decode(value);
+      text.split('\n').forEach(onLine);
+      render();
+    });
+    await bleCharacteristic.startNotifications();
+    mode='live';transport='ble';logs=[];logDirty=true;
+    note('Connected to ESP32 over secure Bluetooth. Readings update live.');
+    render();
+  }catch(e){
+    bleCharacteristic=null;bleDevice=null;
+    note(e&&e.name==='NotFoundError'?'No ESP32 selected.':'Bluetooth connection failed. Check pairing, permissions, and that the ESP32 is advertising.');
+  }
+}
+async function disconnect(){
+  try{if(reader)await reader.cancel();}catch(e){}
+  try{if(writer)await writer.close();}catch(e){}
+  try{if(port)await port.close();}catch(e){}
+  if(bleDevice&&bleDevice.gatt&&bleDevice.gatt.connected)bleDevice.gatt.disconnect();
+  bleDevice=null;bleCharacteristic=null;reader=null;writer=null;port=null;
+  goSim('Disconnected. Back on the simulator.');
+  render();
+}
+function goSim(msg){
+  mode='sim';transport='none';reader=null;writer=null;port=null;bleCharacteristic=null;bleDevice=null;
+  S.flame=0;S.pir=0;S.alarm=false;S.fire=false;S.appliances=true;
+  note(msg||'Running on the built-in simulator.');
+}
+
+/* ---------- rendering ---------- */
+function chip(id,text,tone){var e=$(id);e.textContent=text;e.setAttribute('data-tone',tone);}
+function setRange(id,val){var e=$(id);if(document.activeElement!==e)e.value=val;}
+function lcdLines(){
+  var t=now();
+  if(S.fire)return ['!! FLAME !!','BUZZER + LED ON'];
+  if(S.alarm)return ['INTRUDER','DETECTED!'];
+  if(t<lcdUntil)return lcdMsg;
+  var p=Math.floor(t/2500)%3;
+  if(p===0)return ['T:'+S.temp.toFixed(1)+'C H:'+Math.round(S.hum)+'%','Sec:'+(S.armed?'ARMED':'DISARMED')];
+  if(p===1)return ['Door:'+(S.locked?'LOCKED':'UNLOCKED'),'Fire:'+(S.fire?'ALARM':'SAFE')];
+  return ['Light:'+(S.light?'ON':'OFF'),'Mode:'+(S.lm==='A'?'AUTO':S.lm==='1'?'MANUAL ON':'MANUAL OFF')];
+}
+function render(){
+  var dark=S.ldr<S.dark,t=now();
+  $('modePill').textContent=mode==='live'?(transport==='ble'?'Live · BLE':'Live · USB'):'Simulator';
+  $('modePill').setAttribute('data-live',mode==='live'?'1':'0');
+  $('connectBleBtn').textContent=mode==='live'?'Disconnect':'Connect Bluetooth';
+  $('connectBleBtn').className=mode==='live'&&transport==='ble'?'btn danger':'btn primary';
+  $('connectUsbBtn').textContent=mode==='live'&&transport==='usb'?'Disconnect USB':'Connect USB';
+  $('connectUsbBtn').hidden=mode==='live'&&transport==='ble';
+  $('connectBleBtn').hidden=mode==='live'&&transport==='usb';
+  $('simPanel').hidden=mode==='live';
+
+  var st='idle',main='System ready',sub='All connected sensors are operating normally.';
+  if(S.fire){st='fire';main='Flame detected';sub='Buzzer and indicator LED are on. This is not a certified fire alarm.';}
+  else if(S.alarm){st='alarm';main='Intruder detected';sub='Buzzer and indicator LED are on. Disarm to silence.';}
+  else if(S.armed){st='armed';main='Armed';sub='Watching entrances and restricted areas.';}
+  $('banner').setAttribute('data-state',st);
+  $('bannerState').textContent=main;$('bannerSub').textContent=sub;
+
+  var l=lcdLines();$('lcd').textContent=pad(l[0])+'\n'+pad(l[1]);
+
+  $('tempBig').innerHTML=S.temp.toFixed(1)+'<span>°C</span>';
+  $('humV').innerHTML=Math.round(S.hum)+'<span>%</span>';
+
+  $('ldrV').innerHTML=Math.round(S.ldr)+'<span>/ 4095</span>';
+  chip('darkChip',dark?'Dark':'Bright',dark?'warn':'off');
+  chip('pirChip',S.pir?'Motion':'No motion',S.pir?'warn':'off');
+  chip('lightChip',S.light?'Lights on':'Lights off',S.light?'on':'off');
+  chip('fanChip',S.fan?'On':'Off',S.fan?'on':'off');
+  $('darkVal').textContent=S.dark;setRange('darkIn',S.dark);
+  $('toutVal').textContent=S.tout+' s';setRange('toutIn',S.tout);
+
+  $('doorBig').textContent=S.locked?'Locked':'Unlocked';
+  $('doorBig').style.color=S.locked?'var(--ink)':'var(--warn)';
+  chip('doorChip',S.locked?'Locked':'Unlocked',S.locked?'ok':'warn');
+  $('doorBtn').textContent=S.locked?'Unlock door':'Lock door';
+  $('cardTxt').textContent=S.cardTxt||'None yet';
+
+  $('fireBig').textContent=S.fire?'Flame!':'No flame';
+  $('fireBig').style.color=S.fire?'var(--bad)':'var(--ink)';
+  chip('fireChip',S.fire?'Emergency':'Safe',S.fire?'bad':'ok');
+  chip('ledChip',S.light?'LED on':'LED off',S.fire?'bad':S.light?'on':'off');
+  chip('fireBuzzerChip',S.buzzer?'Buzzer on':'Buzzer idle',S.buzzer?'bad':'off');
+
+  document.querySelectorAll('.seg').forEach(function(g){
+    var cur=g.getAttribute('data-cmd')==='FAN'?(S.fan?'1':'0'):S.lm;
+    g.querySelectorAll('button').forEach(function(b){b.setAttribute('aria-pressed',b.getAttribute('data-v')===cur?'true':'false');});
+  });
+  $('sFlame').setAttribute('aria-pressed',S.flame?'true':'false');
+  $('sFlame').textContent=S.flame?'Remove flame':'Hold flame near sensor';
+  $('sTempV').textContent=(+$('sTemp').value).toFixed(1)+' °C';
+  $('sHumV').textContent=$('sHum').value+' %';
+  $('sLdrV').textContent=$('sLdr').value;
+
+  if(logDirty&&$('logBody')&&$('labBody')){renderLog();logDirty=false;}
+}
+function renderLog(){
+  $('logEmpty').hidden=logs.length>0;
+  $('logBody').innerHTML=logs.slice(0,60).map(function(e){
+    var btn=e.lab?'<button class="mini" type="button" data-id="'+e.id+'" aria-pressed="'+(e.bad?'true':'false')+'">'+(e.bad?'Marked wrong':'Mark wrong')+'</button>':'';
+    return '<tr><td class="mono">'+e.time.toLocaleTimeString([], {hour12:false})+'</td><td class="mono">'+esc(e.kind)+'</td><td>'+esc(e.text)+'</td><td>'+e.ctx.light+' / '+e.ctx.sec+'</td><td class="mono">'+(e.rt==null?'—':(e.rt/1000).toFixed(3)+' s')+'</td><td>'+btn+'</td></tr>';
+  }).join('');
+  var rows=[['Bright','Normal'],['Bright','Intrusion'],['Dim','Normal'],['Dim','Intrusion']];
+  $('labBody').innerHTML=rows.map(function(r){
+    var ev=logs.filter(function(e){return e.ctx.light===r[0]&&e.ctx.sec===r[1];});
+    var rts=ev.filter(function(e){return e.rt!=null;}).map(function(e){return e.rt;});
+    var avg=rts.length?(rts.reduce(function(a,b){return a+b;},0)/rts.length/1000).toFixed(3):'—';
+    var acc=function(k){var a=ev.filter(function(e){return e.lab===k;});return a.length?Math.round(100*a.filter(function(e){return !e.bad;}).length/a.length)+' %':'—';};
+    return '<tr><td>'+r[0]+'</td><td>'+r[1]+'</td><td>'+ev.length+'</td><td>'+avg+'</td><td>'+acc('rfid')+'</td><td>'+acc('motion')+'</td><td>'+acc('light')+'</td></tr>';
+  }).join('');
+}
+
+/* ---------- wiring ---------- */
+document.querySelectorAll('.seg').forEach(function(g){
+  g.addEventListener('click',function(ev){
+    var b=ev.target.closest('button');if(!b)return;
+    cmd(g.getAttribute('data-cmd'),b.getAttribute('data-v'));render();
+  });
+});
+function bindRange(id,name){$(id).addEventListener('change',function(){cmd(name,this.value);render();});
+  $(id).addEventListener('input',function(){
+    var v=this.value;
+    if(id==='darkIn')$('darkVal').textContent=v;
+    if(id==='toutIn')$('toutVal').textContent=v+' s';
+  });}
+bindRange('darkIn','DARK');bindRange('toutIn','TOUT');
+$('doorBtn').addEventListener('click',function(){cmd('DOOR',S.locked?0:1);render();});
+$('connectBleBtn').addEventListener('click',function(){if(mode==='live')disconnect();else connectBluetooth();});
+$('connectUsbBtn').addEventListener('click',function(){if(mode==='live')disconnect();else connectSerial();});
+$('sTemp').addEventListener('input',function(){S.temp=+this.value;simStep();render();});
+$('sHum').addEventListener('input',function(){S.hum=+this.value;render();});
+$('sLdr').addEventListener('input',function(){S.ldr=+this.value;simStep();render();});
+$('sAuth').addEventListener('click',function(){simCard(true);render();});
+$('sUnk').addEventListener('click',function(){simCard(false);render();});
+$('sFlame').addEventListener('click',function(){S.flame=S.flame?0:1;simStep();render();});
+if($('logBody')){
+  $('logBody').addEventListener('click',function(ev){
+    var b=ev.target.closest('.mini');if(!b)return;
+    var id=+b.getAttribute('data-id');
+    logs.forEach(function(e){if(e.id===id)e.bad=!e.bad;});
+    logDirty=true;render();
+  });
+}
+if($('clearBtn'))$('clearBtn').addEventListener('click',function(){logs=[];logDirty=true;$('copyNote').textContent='';render();});
+if($('copyBtn'))$('copyBtn').addEventListener('click',function(){
+  var head='time,type,event,ambient_light,security,response_ms,correct';
+  var rows=logs.slice().reverse().map(function(e){
+    return [e.time.toLocaleTimeString([], {hour12:false}),e.kind,'"'+e.text.replace(/"/g,'""')+'"',e.ctx.light,e.ctx.sec,e.rt==null?'':e.rt,e.lab?(e.bad?'N':'Y'):''].join(',');
+  });
+  var csv=[head].concat(rows).join('\n');
+  var ok=function(){$('copyNote').textContent='Copied '+rows.length+' rows. Paste into Excel or Sheets.';};
+  var fail=function(){$('copyNote').textContent='Copy was blocked. Select the table and copy it by hand.';};
+  try{navigator.clipboard.writeText(csv).then(ok,fail);}catch(e){fail();}
+});
+if(!navigator.bluetooth&&!('serial' in navigator)){note('Running on the built-in simulator. Connect with Android Chrome over HTTPS via Bluetooth, or Chrome/Edge on a computer via USB.');}
+
+setInterval(function(){if(mode==='sim')simStep();render();},400);
+simStep();render();
+})();
+</script>
+</body></html>
