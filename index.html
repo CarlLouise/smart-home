@@ -372,11 +372,15 @@ async function connectSerial(){
 }
 async function connectBluetooth(){
   if(!navigator.bluetooth){note('Web Bluetooth is unavailable. Use Android Chrome over HTTPS, or connect by USB on a computer.');return;}
+  var bleStep='device selection';
   try{
     bleDevice=await navigator.bluetooth.requestDevice({filters:[{services:[bleServiceUuid]}]});
     bleDevice.addEventListener('gattserverdisconnected',function(){goSim('Bluetooth disconnected. Back on the simulator.');render();});
+    bleStep='GATT connection';
     var server=await bleDevice.gatt.connect();
+    bleStep='service lookup';
     var service=await server.getPrimaryService(bleServiceUuid);
+    bleStep='characteristic lookup';
     bleCharacteristic=await service.getCharacteristic(bleCharacteristicUuid);
     bleCharacteristic.addEventListener('characteristicvaluechanged',function(ev){
       var value=ev.target.value;
@@ -384,13 +388,17 @@ async function connectBluetooth(){
       text.split('\n').forEach(onLine);
       render();
     });
+    bleStep='notification setup';
     await bleCharacteristic.startNotifications();
     mode='live';transport='ble';logs=[];logDirty=true;
     note('Connected to ESP32 over secure Bluetooth. Readings update live.');
     render();
   }catch(e){
+    if(bleDevice&&bleDevice.gatt&&bleDevice.gatt.connected)bleDevice.gatt.disconnect();
     bleCharacteristic=null;bleDevice=null;
-    note(e&&e.name==='NotFoundError'?'No ESP32 selected.':'Bluetooth connection failed. Check pairing, permissions, and that the ESP32 is advertising.');
+    var name=e&&e.name?e.name:'Error';
+    var detail=e&&e.message?e.message:'No error details available.';
+    note(name==='NotFoundError'?'No ESP32 selected.':'Bluetooth failed during '+bleStep+' ('+name+'): '+detail);
   }
 }
 async function disconnect(){
