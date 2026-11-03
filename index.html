@@ -217,6 +217,7 @@ td.mono{font-family:var(--f-mono);font-size:12px}
 var $=function(id){return document.getElementById(id);};
 var S={temp:27.5,hum:62,ldr:2600,pir:0,flame:0,armed:false,locked:true,light:false,fan:false,alarm:false,fire:false,buzzer:false,appliances:true,lm:'A',dark:1600,tout:30};
 var mode='sim',transport='none',port=null,writer=null,reader=null,bleDevice=null,bleCharacteristic=null;
+var bleWriteQueue=Promise.resolve();
 var bleServiceUuid='7d2ea28a-f7bd-485a-bd9d-92ad6ecfe93e';
 var bleCharacteristicUuid='7d2ea28b-f7bd-485a-bd9d-92ad6ecfe93e';
 var pirUntil=0,unlockUntil=0,doorHold=false,deniedUntil=0,lcdMsg=['',''],lcdUntil=0,autoLit=false,lastMotion=0,logId=0,logDirty=true;
@@ -300,8 +301,11 @@ function simCard(ok){
 function note(m){$('connNote').textContent=m;}
 function send(line){
   if(transport==='ble'&&bleCharacteristic){
+    var characteristic=bleCharacteristic;
     var bytes=new TextEncoder().encode(line+'\n');
-    bleCharacteristic.writeValueWithResponse(bytes).catch(function(e){
+    bleWriteQueue=bleWriteQueue.then(function(){
+      return characteristic.writeValueWithResponse(bytes);
+    }).catch(function(e){
       var name=e&&e.name?e.name:'Error';
       var detail=e&&e.message?e.message:'No error details available.';
       note('BLE write failed ('+name+'): '+detail);
