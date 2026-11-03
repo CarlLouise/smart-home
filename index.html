@@ -315,6 +315,17 @@ function send(line){
   }
 }
 function parseKv(parts){var o={};parts.forEach(function(p){var i=p.indexOf('=');if(i>0)o[p.slice(0,i)]=p.slice(i+1);});return o;}
+async function connectBleServiceWithRetry(device){
+  for(var attempt=0;attempt<2;attempt++){
+    try{
+      var server=device.gatt.connected?device.gatt:await device.gatt.connect();
+      return await server.getPrimaryService(bleServiceUuid);
+    }catch(e){
+      if(attempt===1||device.gatt.connected)throw e;
+      await new Promise(function(resolve){setTimeout(resolve,300);});
+    }
+  }
+}
 function onLine(line){
   line=line.trim(); if(line.length<3)return;
   var head=line.slice(0,2),parts=line.slice(2).split(';');
@@ -381,9 +392,8 @@ async function connectBluetooth(){
     bleDevice=await navigator.bluetooth.requestDevice({filters:[{services:[bleServiceUuid]}]});
     bleDevice.addEventListener('gattserverdisconnected',function(){goSim('Bluetooth disconnected. Back on the simulator.');render();});
     bleStep='GATT connection';
-    var server=await bleDevice.gatt.connect();
     bleStep='service lookup';
-    var service=await server.getPrimaryService(bleServiceUuid);
+    var service=await connectBleServiceWithRetry(bleDevice);
     bleStep='characteristic lookup';
     bleCharacteristic=await service.getCharacteristic(bleCharacteristicUuid);
     bleCharacteristic.addEventListener('characteristicvaluechanged',function(ev){
