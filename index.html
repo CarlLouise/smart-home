@@ -301,7 +301,11 @@ function note(m){$('connNote').textContent=m;}
 function send(line){
   if(transport==='ble'&&bleCharacteristic){
     var bytes=new TextEncoder().encode(line+'\n');
-    bleCharacteristic.writeValueWithResponse(bytes).catch(function(){note('BLE command failed. Check the Bluetooth connection.');});
+    bleCharacteristic.writeValueWithResponse(bytes).catch(function(e){
+      var name=e&&e.name?e.name:'Error';
+      var detail=e&&e.message?e.message:'No error details available.';
+      note('BLE write failed ('+name+'): '+detail);
+    });
   }else if(writer){
     writer.write(line+'\n').catch(function(){note('USB command failed. Check the cable and connection.');});
   }
